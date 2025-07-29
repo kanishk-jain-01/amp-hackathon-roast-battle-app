@@ -21,13 +21,11 @@ export default function Home() {
       </Head>
       <main className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
         <div className="text-center max-w-2xl mx-auto">
-          <h1 className="text-6xl font-bold text-white mb-6 tracking-tight">
-            🔥 ROAST BATTLE 🔥
-          </h1>
+          <h1 className="text-6xl font-bold text-white mb-6 tracking-tight">🔥 ROAST BATTLE 🔥</h1>
           <p className="text-xl text-gray-300 mb-12">
             Where AI meets human wit in the ultimate comedy showdown
           </p>
-          
+
           <div className="space-y-6">
             <button
               onClick={createNewBattle}
@@ -35,10 +33,12 @@ export default function Home() {
             >
               Start New Battle
             </button>
-            
+
             {battleId && (
               <div className="bg-white/10 backdrop-blur rounded-lg p-6">
-                <p className="text-white mb-4">Battle ID: <code className="bg-black/20 px-2 py-1 rounded">{battleId}</code></p>
+                <p className="text-white mb-4">
+                  Battle ID: <code className="bg-black/20 px-2 py-1 rounded">{battleId}</code>
+                </p>
                 <div className="space-x-4">
                   <Link
                     href={`/battle/${battleId}`}

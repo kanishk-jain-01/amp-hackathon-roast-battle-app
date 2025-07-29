@@ -1,4 +1,5 @@
-# Live Roast Battle – Implementation Plan  
+# Live Roast Battle – Implementation Plan
+
 (Next.js + React, Zustand, Tailwind CSS / ShadCN, Vercel)
 
 ---
@@ -42,24 +43,24 @@
 
 ## 2. Component Breakdown (Main App)
 
-| Component | Responsibility |
-|-----------|----------------|
-| `BattleController` | Orchestrates rounds, timers, coin flip, requests AI roasts, dispatches events to WS. |
+| Component          | Responsibility                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------- |
+| `BattleController` | Orchestrates rounds, timers, coin flip, requests AI roasts, dispatches events to WS.  |
 | `StageLayout`      | Host/stage viewport, displays current speaker, topic, timer, audio wave, vote counts. |
-| `RoastCard`        | Renders individual roast text + optional audio play controls. |
-| `TopicStepper`     | Visual progress through 3 rounds. |
-| `CoinFlipModal`    | Animated coin toss; sets initial turn. |
-| `QRDisplay`        | Generates QR via `next-qrcode`, holds voting URL w/ battleId. |
-| `VoteBar`          | Real-time bar or donut chart; updates via WS. |
-| `WinnerModal`      | Announces winner at end. |
-| `SettingsDrawer`   | Select AI model (GPT-4o, Claude 3, etc.) and Eleven Labs voice. |
+| `RoastCard`        | Renders individual roast text + optional audio play controls.                         |
+| `TopicStepper`     | Visual progress through 3 rounds.                                                     |
+| `CoinFlipModal`    | Animated coin toss; sets initial turn.                                                |
+| `QRDisplay`        | Generates QR via `next-qrcode`, holds voting URL w/ battleId.                         |
+| `VoteBar`          | Real-time bar or donut chart; updates via WS.                                         |
+| `WinnerModal`      | Announces winner at end.                                                              |
+| `SettingsDrawer`   | Select AI model (GPT-4o, Claude 3, etc.) and Eleven Labs voice.                       |
 
 Voter App Components
 | Component | Responsibility |
 |-----------|----------------|
 | `VotePage` | Connect to battle room; display speaker A/B buttons and live bar. |
 | `WaitingScreen` | Pre-battle or between rounds. |
-| `ResultScreen`  | Final winner & share link. |
+| `ResultScreen` | Final winner & share link. |
 
 ---
 
@@ -104,7 +105,7 @@ Cross-app sync:
 
 3. Realtime Pub/Sub  
    • Pusher Channels (`battle-${id}`) events:  
-     − `roast_ready`, `vote_update`, `round_change`, `battle_end`  
+    − `roast_ready`, `vote_update`, `round_change`, `battle_end`  
    • Server auth route for private channels.
 
 4. Voting  
@@ -122,6 +123,7 @@ Cross-app sync:
 **No Persistent Database** - Everything stored in memory/real-time:
 
 In-Memory Data Structures:
+
 ```
 battles: Map<battleId, BattleState>
 votes: Map<battleId, Map<voterHash, VoteData>>

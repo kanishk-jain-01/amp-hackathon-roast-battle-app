@@ -1,5 +1,5 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { type ClassValue, clsx } from 'clsx'
+import { twMerge } from 'tailwind-merge'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -11,7 +11,9 @@ export function generateBattleId(): string {
 
 export function generateVoterHash(): string {
   const fingerprint = `${navigator.userAgent}-${screen.width}-${screen.height}-${new Date().getTimezoneOffset()}`
-  return btoa(fingerprint).replace(/[^a-zA-Z0-9]/g, '').substring(0, 16)
+  return btoa(fingerprint)
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .substring(0, 16)
 }
 
 export function formatTimer(seconds: number): string {

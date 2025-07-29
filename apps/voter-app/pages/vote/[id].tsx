@@ -10,10 +10,10 @@ export default function VotePage() {
 
   const handleVote = (voteFor: 'human' | 'ai') => {
     if (hasVoted) return
-    
+
     setSelectedVote(voteFor)
     setHasVoted(true)
-    
+
     // TODO: Send vote to API
     console.log(`Voted for ${voteFor} in battle ${id}`)
   }
@@ -27,24 +27,20 @@ export default function VotePage() {
       <main className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
         <div className="max-w-md mx-auto">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">
-              🗳️ Cast Your Vote
-            </h1>
-            <p className="text-gray-300">
-              Battle ID: {id}
-            </p>
+            <h1 className="text-3xl font-bold text-white mb-2">🗳️ Cast Your Vote</h1>
+            <p className="text-gray-300">Battle ID: {id}</p>
           </div>
-          
+
           {!hasVoted ? (
             <div className="space-y-4">
-              <button 
+              <button
                 onClick={() => handleVote('human')}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-6 px-6 rounded-lg text-xl transition-all transform hover:scale-105"
               >
                 Vote for Human 🧑
               </button>
-              
-              <button 
+
+              <button
                 onClick={() => handleVote('ai')}
                 className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-6 px-6 rounded-lg text-xl transition-all transform hover:scale-105"
               >
@@ -61,7 +57,7 @@ export default function VotePage() {
               </p>
             </div>
           )}
-          
+
           <div className="mt-8 bg-white/10 backdrop-blur rounded-lg p-4">
             <h3 className="text-white font-bold mb-2">Live Scores</h3>
             <div className="text-white space-y-1">
@@ -75,11 +71,9 @@ export default function VotePage() {
               </div>
             </div>
           </div>
-          
+
           <div className="mt-6 text-center">
-            <p className="text-gray-400 text-sm">
-              Round 1 of 3 • Topic: Coming Soon
-            </p>
+            <p className="text-gray-400 text-sm">Round 1 of 3 • Topic: Coming Soon</p>
           </div>
         </div>
       </main>
