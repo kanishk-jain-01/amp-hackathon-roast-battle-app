@@ -9,6 +9,8 @@
 # Next.js
 /.next/
 /out/
+**/.next/
+**/out/
 
 # Production
 /build
@@ -32,6 +34,10 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Turbo
+.turbo/
+**/.turbo/
 
 # Prisma
 /prisma/migrations
