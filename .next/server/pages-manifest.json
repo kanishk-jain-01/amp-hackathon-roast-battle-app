@@ -1,0 +1,11 @@
+{
+  "/_app": "pages/_app.js",
+  "/_error": "pages/_error.js",
+  "/_document": "pages/_document.js",
+  "/": "pages/index.js",
+  "/api/game-control": "pages/api/game-control.js",
+  "/api/get-votes": "pages/api/get-votes.js",
+  "/api/submit-vote": "pages/api/submit-vote.js",
+  "/api/generate-roast": "pages/api/generate-roast.js",
+  "/vote": "pages/vote.js"
+}

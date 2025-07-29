@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Animations */
+@keyframes roast-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+.roast-pulse {
+  animation: roast-pulse 2s infinite;
+}
+
+/* Custom gradient backgrounds */
+.bg-roast-gradient {
+  background: linear-gradient(135deg, #1a1a1a 0%, #4a0e4e 50%, #ff6b35 100%);
+}
+
+/* Vote bar animations */
+.vote-transition {
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Confetti animation */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-100vh) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+.confetti {
+  animation: confetti-fall 3s linear infinite;
+} 
