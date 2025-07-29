@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Forward to main app
-    const mainAppUrl = process.env.MAIN_APP_URL || 'http://localhost:3003'
+    const mainAppUrl = process.env.MAIN_APP_URL || 'http://localhost:3000'
     const response = await fetch(`${mainAppUrl}/api/battle/${battleId}/vote`, {
       method: 'POST',
       headers: {

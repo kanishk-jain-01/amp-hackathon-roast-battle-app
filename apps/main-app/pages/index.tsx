@@ -1,14 +1,13 @@
-import { useState } from 'react'
 import Head from 'next/head'
-import Link from 'next/link'
+import { useRouter } from 'next/router'
 import { generateBattleId } from '@roast-battle/ui'
 
 export default function Home() {
-  const [battleId, setBattleId] = useState<string>('')
+  const router = useRouter()
 
   const createNewBattle = () => {
     const newBattleId = generateBattleId()
-    setBattleId(newBattleId)
+    router.push(`/battle/${newBattleId}`)
   }
 
   return (
@@ -33,30 +32,6 @@ export default function Home() {
             >
               Start New Battle
             </button>
-
-            {battleId && (
-              <div className="bg-white/10 backdrop-blur rounded-lg p-6">
-                <p className="text-white mb-4">
-                  Battle ID: <code className="bg-black/20 px-2 py-1 rounded">{battleId}</code>
-                </p>
-                <div className="space-x-4">
-                  <Link
-                    href={`/battle/${battleId}`}
-                    className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded transition-colors"
-                  >
-                    Host Battle
-                  </Link>
-                  <a
-                    href={`http://localhost:3001/vote/${battleId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded transition-colors"
-                  >
-                    Vote Page
-                  </a>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </main>

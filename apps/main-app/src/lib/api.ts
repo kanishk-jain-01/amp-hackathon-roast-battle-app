@@ -6,7 +6,7 @@ class APIService {
   constructor() {
     this.baseUrl = process.env.NODE_ENV === 'production' 
       ? 'https://your-production-domain.com' 
-      : 'http://localhost:3003'
+      : 'http://localhost:3000'
   }
 
   // Battle operations
