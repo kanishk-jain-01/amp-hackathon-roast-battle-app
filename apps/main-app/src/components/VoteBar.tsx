@@ -60,7 +60,7 @@ export function VoteBar({ humanVotes, aiVotes, audienceCount }: VoteBarProps) {
           ) : aiVotes > humanVotes ? (
             <div className="text-red-400 font-medium">🤖 AI Leading!</div>
           ) : (
-            <div className="text-yellow-400 font-medium">🔥 It's a tie!</div>
+            <div className="text-yellow-400 font-medium">🔥 It&apos;s a tie!</div>
           )}
         </div>
       )}

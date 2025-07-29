@@ -13,12 +13,6 @@ export function CoinFlipModal({ isOpen, onResult, onClose }: CoinFlipModalProps)
   const [result, setResult] = useState<Speaker | null>(null)
   const [showResult, setShowResult] = useState(false)
 
-  useEffect(() => {
-    if (isOpen && !isFlipping) {
-      startCoinFlip()
-    }
-  }, [isOpen])
-
   const startCoinFlip = () => {
     setIsFlipping(true)
     setResult(null)
@@ -38,6 +32,12 @@ export function CoinFlipModal({ isOpen, onResult, onClose }: CoinFlipModalProps)
       }, 2000)
     }, 3000)
   }
+
+  useEffect(() => {
+    if (isOpen && !isFlipping) {
+      startCoinFlip()
+    }
+  }, [isOpen, isFlipping])
 
   if (!isOpen) return null
 

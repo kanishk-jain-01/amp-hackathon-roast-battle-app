@@ -33,6 +33,7 @@ export function QRDisplay({ battleId }: QRDisplayProps) {
     <div className="text-center">
       {qrCodeUrl ? (
         <div className="bg-white p-4 rounded-lg inline-block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={qrCodeUrl} alt={`QR Code for battle ${battleId}`} className="w-48 h-48" />
         </div>
       ) : (
