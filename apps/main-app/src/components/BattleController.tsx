@@ -4,6 +4,7 @@ import { useSettingsStore } from '@/store/settingsStore'
 import { useConnectionStore } from '@/store/connectionStore'
 import { generateBattleId } from '@roast-battle/ui'
 import { Battle, Speaker } from '@roast-battle/ui'
+import { apiService } from '@/lib/api'
 
 interface BattleControllerProps {
   battleId?: string
@@ -12,8 +13,9 @@ interface BattleControllerProps {
 
 export function BattleController({ battleId, children }: BattleControllerProps) {
   const [isInitialized, setIsInitialized] = useState(false)
-  const { battle, setBattle, setLoading, nextRound, setTurn, updateTimer } = useBattleStore()
-  const { topics, coinFlipResult, setCoinFlipResult } = useSettingsStore()
+  const [eventSource, setEventSource] = useState<EventSource | null>(null)
+  const { battle, setBattle, setLoading, nextRound, setTurn, updateTimer, addRoast, updateVoteTally, setAudienceCount } = useBattleStore()
+  const { topics, coinFlipResult, setCoinFlipResult, aiModel, voice } = useSettingsStore()
   const { setWSStatus } = useConnectionStore()
 
   // Initialize battle
@@ -48,17 +50,77 @@ export function BattleController({ battleId, children }: BattleControllerProps) 
     }, 3000) // 3 second animation
   }, [setCoinFlipResult, setTurn, setLoading])
 
+  // Real-time event handler
+  const handleRealtimeUpdate = useCallback((data: any) => {
+    switch (data.type) {
+      case 'vote_update':
+        updateVoteTally(data.round, data.roundTally)
+        setAudienceCount(data.audienceCount)
+        break
+      case 'roast_ready':
+        addRoast(data.roast)
+        break
+      case 'battle_updated':
+        setBattle(data.battle)
+        break
+    }
+  }, [updateVoteTally, setAudienceCount, addRoast, setBattle])
+
   // Start battle
-  const startBattle = useCallback(() => {
+  const startBattle = useCallback(async () => {
     if (!battle) return
 
-    setBattle({
-      ...battle,
-      status: 'live',
-      timer: 60, // 60 seconds per turn
-    })
-    setWSStatus('connected') // Mock connection
-  }, [battle, setBattle, setWSStatus])
+    try {
+      setLoading(true)
+      
+      // Create battle via API
+      const createdBattle = await apiService.createBattle(topics, coinFlipResult)
+      setBattle({
+        ...createdBattle,
+        status: 'live',
+        timer: 60,
+      })
+
+      // Start real-time events
+      const eventsource = apiService.connectToEvents(createdBattle.id, handleRealtimeUpdate)
+      setEventSource(eventsource)
+      setWSStatus('connected')
+      
+    } catch (error) {
+      console.error('Failed to start battle:', error)
+      setWSStatus('disconnected')
+    } finally {
+      setLoading(false)
+    }
+  }, [battle, topics, coinFlipResult, setBattle, setWSStatus, setLoading, handleRealtimeUpdate])
+
+  // AI turn handler
+  const handleAITurn = useCallback(async () => {
+    if (!battle || battle.turn !== 'ai') return
+    
+    const currentTopic = battle.topics[battle.currentRound - 1]
+    
+    try {
+      setLoading(true)
+      const aiRoast = await apiService.generateAIRoast(battle.id, {
+        topic: currentTopic,
+        model: aiModel.id,
+        voice: voice.id,
+        round: battle.currentRound
+      })
+      
+      addRoast(aiRoast)
+      setTurn('human') // Switch to human
+      updateTimer(60) // Reset timer
+    } catch (error) {
+      console.error('AI roast failed:', error)
+      // Switch turns anyway to keep game moving
+      setTurn('human')
+      updateTimer(60)
+    } finally {
+      setLoading(false)
+    }
+  }, [battle, aiModel.id, voice.id, setLoading, addRoast, setTurn, updateTimer])
 
   // Timer logic
   useEffect(() => {
@@ -68,15 +130,19 @@ export function BattleController({ battleId, children }: BattleControllerProps) 
       updateTimer(battle.timer - 1)
 
       if (battle.timer <= 1) {
-        // Switch turns when timer expires
-        const nextSpeaker: Speaker = battle.turn === 'human' ? 'ai' : 'human'
-        setTurn(nextSpeaker)
-        updateTimer(60) // Reset timer
+        // Auto-trigger AI turn when it's AI's turn and timer expires
+        if (battle.turn === 'ai') {
+          handleAITurn()
+        } else {
+          // Switch to AI turn
+          setTurn('ai')
+          updateTimer(60)
+        }
       }
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [battle, updateTimer, setTurn])
+  }, [battle, updateTimer, setTurn, handleAITurn])
 
   // Round progression logic
   const advanceRound = useCallback(() => {
@@ -105,6 +171,15 @@ export function BattleController({ battleId, children }: BattleControllerProps) 
     }
   }, [battleId, initializeBattle, isInitialized])
 
+  // Cleanup EventSource on unmount
+  useEffect(() => {
+    return () => {
+      if (eventSource) {
+        eventSource.close()
+      }
+    }
+  }, [eventSource])
+
   // Expose controller methods through context or props
   const controllerMethods = {
     initializeBattle,
@@ -126,8 +201,8 @@ export function BattleController({ battleId, children }: BattleControllerProps) 
 // Custom hook to access battle controller methods
 export function useBattleController() {
   const battle = useBattleStore(state => state.battle)
-  const { setLoading, nextRound, setTurn, updateTimer, setBattle } = useBattleStore()
-  const { coinFlipResult, setCoinFlipResult } = useSettingsStore()
+  const { setLoading, nextRound, setTurn, updateTimer, setBattle, addRoast, updateVoteTally, setAudienceCount } = useBattleStore()
+  const { topics, coinFlipResult, setCoinFlipResult, aiModel, voice } = useSettingsStore()
   const { setWSStatus } = useConnectionStore()
 
   const performCoinFlip = useCallback(() => {
@@ -141,16 +216,70 @@ export function useBattleController() {
     }, 3000)
   }, [setCoinFlipResult, setTurn, setLoading])
 
-  const startBattle = useCallback(() => {
+  const handleRealtimeUpdate = useCallback((data: any) => {
+    switch (data.type) {
+      case 'vote_update':
+        updateVoteTally(data.round, data.roundTally)
+        setAudienceCount(data.audienceCount)
+        break
+      case 'roast_ready':
+        addRoast(data.roast)
+        break
+      case 'battle_updated':
+        setBattle(data.battle)
+        break
+    }
+  }, [updateVoteTally, setAudienceCount, addRoast, setBattle])
+
+  const startBattle = useCallback(async () => {
     if (!battle) return
 
-    setBattle({
-      ...battle,
-      status: 'live',
-      timer: 60,
-    })
-    setWSStatus('connected')
-  }, [battle, setBattle, setWSStatus])
+    try {
+      setLoading(true)
+      
+      const createdBattle = await apiService.createBattle(topics, coinFlipResult)
+      setBattle({
+        ...createdBattle,
+        status: 'live',
+        timer: 60,
+      })
+
+      const eventSource = apiService.connectToEvents(createdBattle.id, handleRealtimeUpdate)
+      setWSStatus('connected')
+      
+    } catch (error) {
+      console.error('Failed to start battle:', error)
+      setWSStatus('disconnected')
+    } finally {
+      setLoading(false)
+    }
+  }, [battle, topics, coinFlipResult, setBattle, setWSStatus, setLoading, handleRealtimeUpdate])
+
+  const handleAITurn = useCallback(async () => {
+    if (!battle || battle.turn !== 'ai') return
+    
+    const currentTopic = battle.topics[battle.currentRound - 1]
+    
+    try {
+      setLoading(true)
+      const aiRoast = await apiService.generateAIRoast(battle.id, {
+        topic: currentTopic,
+        model: aiModel.id,
+        voice: voice.id,
+        round: battle.currentRound
+      })
+      
+      addRoast(aiRoast)
+      setTurn('human')
+      updateTimer(60)
+    } catch (error) {
+      console.error('AI roast failed:', error)
+      setTurn('human')
+      updateTimer(60)
+    } finally {
+      setLoading(false)
+    }
+  }, [battle, aiModel.id, voice.id, setLoading, addRoast, setTurn, updateTimer])
 
   const advanceRound = useCallback(() => {
     if (!battle || battle.currentRound >= 3) return
@@ -175,5 +304,6 @@ export function useBattleController() {
     startBattle,
     advanceRound,
     endBattle,
+    handleAITurn,
   }
 }
