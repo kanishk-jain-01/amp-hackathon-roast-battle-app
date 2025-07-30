@@ -287,10 +287,10 @@ export default function GameScreen({ initialGameState, voteUrl }: GameScreenProp
         )}
 
         {/* Game Setup */}
-        {!gameState.gameStarted && (
+        {(!gameState.gameStarted || (gameState.gameStarted && !gameState.topic)) && (
           <div className="max-w-2xl mx-auto mb-8 bg-gray-800 p-6 rounded-lg">
             <h2 className="text-2xl font-bold text-white mb-4 text-center">
-              Start the Battle! 🥊
+              {!gameState.gameStarted ? 'Start the Battle! 🥊' : `Start Round ${gameState.currentRound}! 🥊`}
             </h2>
             <div className="flex flex-col space-y-4">
               <div className="flex space-x-2">

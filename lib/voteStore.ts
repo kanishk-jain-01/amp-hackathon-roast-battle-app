@@ -130,6 +130,8 @@ class VoteStore {
     this.gameState.aiRoast = '';
     this.gameState.votes = { human: 0, ai: 0 };
     this.gameState.isVotingOpen = false;
+    // Keep the game in started state so the UI flow continues
+    this.gameState.gameStarted = true;
     
     return this.getGameState();
   }
