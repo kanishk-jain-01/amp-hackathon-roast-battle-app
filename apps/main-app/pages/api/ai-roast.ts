@@ -3,13 +3,11 @@ import OpenAI from 'openai'
 
 // Mock response for development when API keys aren't available
 const MOCK_ROASTS = [
-  "Well, well, well... if it isn't the topic that thinks it's more relevant than it actually is!",
-  "I've seen more personality in a Windows error message than in this topic right here.",
-  "This topic is like a participation trophy - everyone gets one, but nobody really wants it.",
-  "If this topic was a movie, it would be straight to DVD... in the bargain bin.",
-  "I'd roast this topic harder, but I don't want to waste good material on something so basic.",
-  "This topic has the same energy as elevator music - technically present but nobody's paying attention.",
-  "I've met houseplants with more depth than this topic we're discussing today.",
+  "This topic is so painfully boring, it makes watching paint dry seem like a Marvel movie marathon. I've seen more excitement at a tax seminar, and at least those people are getting paid to suffer through it. This is the kind of topic that makes people fake emergencies just to leave the conversation.",
+  "I've seen more depth in a puddle after a light drizzle and more personality in a Windows 95 error message. This topic has the same energy as that one friend who still thinks Minion memes are peak comedy - technically present but actively making everything worse.",
+  "This topic has the same energy as a grocery store self-checkout that never works, but somehow it's even more frustrating because at least the self-checkout eventually calls for help. This thing just sits there being aggressively mediocre while everyone pretends it's worth discussing.",
+  "If this topic was a person, it would be the guy who still uses Internet Explorer, thinks NFTs are coming back, and unironically says 'that's what she said' in 2024. It's not just outdated - it's actively embarrassing to be associated with.",
+  "This topic is like a participation trophy that nobody even bothered to engrave properly. It's technically an achievement, but it's the kind that makes your parents lie to their friends about what you're doing with your life. Even Wikipedia would mark this as 'citation needed.'",
 ]
 
 interface RoastRequest {
@@ -84,19 +82,21 @@ async function generateOpenAIRoast(
 ): Promise<string> {
   const openai = new OpenAI({ apiKey })
 
-  const systemPrompt = `You are a professional roast comedian performing in a comedy battle. Your job is to create witty, clever, and entertaining roasts about the given topic. 
+  const systemPrompt = `You are a Kill Tony style roast comedian - sharp, quick-witted, and absolutely ruthless but clever. Your job is to absolutely demolish the given topic with surgical precision and dark humor.
 
 Rules:
-- Keep it PG-13 appropriate 
-- Be clever and witty, not mean-spirited
-- Focus on the topic, not individuals
-- Make it punchy and quotable (2-3 sentences max)
-- Avoid repeating previous roasts
-- Channel the energy of Comedy Central Roasts
+- Channel the energy of Kill Tony roasters - edgy but not overly crude
+- Be brutally honest and hilariously savage, but clever above all
+- Focus entirely on roasting the topic to smithereens
+- Make it lengthy, elaborate, and devastating (3-5 sentences, really build the roast)
+- Use modern references, pop culture, and relatable comparisons
+- Think like you're performing at the Comedy Store for comics who've heard everything
+- DO NOT use em dashes (—) in your response
+- Avoid repeating previous roasts - be fresh and original
 
 Previous roasts to avoid repeating: ${previousRoasts.join(', ')}`
 
-  const userPrompt = `Create a hilarious roast about: ${topic}`
+  const userPrompt = `Absolutely destroy this topic with a savage roast: ${topic}`
 
   const completion = await openai.chat.completions.create({
     model: model === 'gpt-4' ? 'gpt-4' : 'gpt-3.5-turbo',
@@ -104,11 +104,11 @@ Previous roasts to avoid repeating: ${previousRoasts.join(', ')}`
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ],
-    max_tokens: 150,
+    max_tokens: 300,
     temperature: 0.9,
   })
 
-  return completion.choices[0]?.message?.content?.trim() || 'I got nothing... which says a lot about this topic.'
+  return completion.choices[0]?.message?.content?.trim() || 'This topic is so bad, even AI refuses to waste compute cycles on it.'
 }
 
 async function generateAnthropicRoast(
@@ -129,13 +129,15 @@ async function generateAnthropicRoast(
     },
     body: JSON.stringify({
       model: model.includes('opus') ? 'claude-3-opus-20240229' : 'claude-3-sonnet-20240229',
-      max_tokens: 150,
+      max_tokens: 300,
       temperature: 0.9,
       messages: [{
         role: 'user',
-        content: `You are a professional roast comedian. Create a witty, PG-13 roast about: ${topic}. 
+        content: `You are a Kill Tony style roast comedian - savage, quick-witted, and absolutely merciless. Completely obliterate this topic: ${topic}. 
         
-        Keep it clever and entertaining (2-3 sentences max). 
+        Be brutally funny and devastating but clever (3-5 sentences, really elaborate and build the destruction). Channel that Comedy Store energy where comics destroy everything.
+        
+        DO NOT use em dashes (—) in your response.
         
         Previous roasts to avoid: ${previousRoasts.join(', ')}`
       }]
@@ -143,5 +145,5 @@ async function generateAnthropicRoast(
   })
 
   const data = await response.json()
-  return data.content?.[0]?.text || 'Even Claude is speechless about this topic.'
+  return data.content?.[0]?.text || 'This topic broke Claude so hard it went into therapy.'
 }
