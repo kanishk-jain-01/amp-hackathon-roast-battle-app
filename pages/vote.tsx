@@ -11,10 +11,83 @@ export default function Vote() {
   const [voteResult, setVoteResult] = useState<'human' | 'ai' | null>(null);
 
   useEffect(() => {
+    // Clear any stale state on mount
+    setGameState(null);
+    setVoteStats(null);
+    setHasVoted(false);
+    setVoteResult(null);
+    setVoting(false);
+    
+    // Force immediate fetch
     fetchGameState();
     const interval = setInterval(fetchGameState, 2000); // Poll every 2 seconds
     return () => clearInterval(interval);
   }, []);
+
+  // Add timeout failsafe for voting state
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    if (voting) {
+      // Reset voting state after 10 seconds to prevent permanent stuck state
+      timeout = setTimeout(() => {
+        console.log('Vote timeout - resetting voting state');
+        setVoting(false);
+      }, 10000);
+    }
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [voting]);
+
+  // Helper function to check if voting is actually allowed
+  const isVotingAllowed = () => {
+    if (!gameState) {
+      console.log('Voting not allowed: No game state');
+      return false;
+    }
+    if (!gameState.gameStarted) {
+      console.log('Voting not allowed: Game not started');
+      return false;
+    }
+    if (!gameState.topic) {
+      console.log('Voting not allowed: No topic');
+      return false;
+    }
+    if (!gameState.aiRoast) {
+      console.log('Voting not allowed: No AI roast');
+      return false;
+    }
+    if (!gameState.isVotingOpen) {
+      console.log('Voting not allowed: Voting closed');
+      return false;
+    }
+    if (hasVoted) {
+      console.log('Voting not allowed: Already voted');
+      return false;
+    }
+    if (voting) {
+      console.log('Voting not allowed: Currently submitting');
+      return false;
+    }
+    console.log('Voting allowed!');
+    return true;
+  };
+
+  // Reset hasVoted when game state changes (new round, game reset, etc.)
+  useEffect(() => {
+    if (gameState) {
+      // Reset voting state when round changes or game resets
+      const currentRoundKey = `${gameState.currentRound}-${gameState.topic}`;
+      const storedRoundKey = localStorage.getItem('currentRound');
+      
+      if (currentRoundKey !== storedRoundKey) {
+        setHasVoted(false);
+        setVoteResult(null);
+        setVoting(false); // Also reset voting state
+        localStorage.setItem('currentRound', currentRoundKey);
+      }
+    }
+  }, [gameState?.currentRound, gameState?.topic]);
 
   const fetchGameState = async () => {
     try {
@@ -22,8 +95,22 @@ export default function Vote() {
       const data = await response.json();
       
       if (data.success) {
+        console.log('Fetched game state:', {
+          gameStarted: data.gameState.gameStarted,
+          isVotingOpen: data.gameState.isVotingOpen,
+          topic: data.gameState.topic,
+          hasAiRoast: !!data.gameState.aiRoast,
+          currentRound: data.gameState.currentRound
+        });
+        
         setGameState(data.gameState);
         setVoteStats(data.voteStats);
+        
+        // If voting is closed, reset voting state to prevent stuck buttons
+        if (!data.gameState.isVotingOpen && voting) {
+          console.log('Voting closed, resetting voting state');
+          setVoting(false);
+        }
       }
     } catch (error) {
       console.error('Error fetching game state:', error);
@@ -33,7 +120,20 @@ export default function Vote() {
   };
 
   const submitVote = async (vote: 'human' | 'ai') => {
-    if (hasVoted) return;
+    console.log('submitVote called with:', vote);
+    
+    // Use the comprehensive validation function
+    if (!isVotingAllowed()) {
+      console.log('Vote submission blocked by validation');
+      return;
+    }
+    
+    console.log('Submitting vote:', vote, 'Game state:', {
+      gameStarted: gameState!.gameStarted,
+      isVotingOpen: gameState!.isVotingOpen,
+      topic: gameState!.topic,
+      hasAiRoast: !!gameState!.aiRoast
+    });
     
     setVoting(true);
 
@@ -51,10 +151,18 @@ export default function Vote() {
         setVoteResult(vote);
         setGameState(data.gameState);
         setVoteStats(data.voteStats);
+        console.log('Vote submitted successfully');
       } else {
-        alert(data.message || 'Failed to submit vote');
+        console.error('Vote submission failed:', data);
+        // Better error message based on the specific error
+        if (data.message?.includes('Voting is not open')) {
+          alert('Voting is currently closed. Please wait for the host to open voting.');
+        } else {
+          alert(data.message || 'Failed to submit vote');
+        }
       }
     } catch (error) {
+      console.error('Vote submission error:', error);
       alert('Error submitting vote. Please try again.');
     } finally {
       setVoting(false);
@@ -150,6 +258,20 @@ export default function Vote() {
                 Round {gameState.currentRound} of {gameState.maxRounds}
               </span>
             </div>
+            
+            {/* Voting Status Indicator */}
+            <div className={`mt-3 px-4 py-2 rounded-lg ${
+              gameState.isVotingOpen 
+                ? 'bg-green-600/20 border border-green-500' 
+                : 'bg-red-600/20 border border-red-500'
+            }`}>
+              <span className={`font-medium ${
+                gameState.isVotingOpen ? 'text-green-300' : 'text-red-300'
+              }`}>
+                {gameState.isVotingOpen ? '🟢 Voting Open' : '🔴 Voting Closed'}
+              </span>
+            </div>
+            
             <div className="mt-3 bg-orange-600/20 px-4 py-2 rounded-lg">
               <span className="text-orange-200 font-medium text-lg">
                 🎯 {gameState.topic}
@@ -240,7 +362,7 @@ export default function Vote() {
               
               <button
                 onClick={() => submitVote('human')}
-                disabled={voting}
+                disabled={!isVotingAllowed()}
                 className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-6 px-6 rounded-2xl font-bold text-xl transition-all duration-200 disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg border-2 border-blue-500"
                 style={{ minHeight: '80px', touchAction: 'manipulation' }}
               >
@@ -249,14 +371,22 @@ export default function Vote() {
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
                     Submitting...
                   </div>
+                ) : !gameState?.isVotingOpen ? (
+                  <div className="flex items-center justify-center">
+                    <span className="mr-2">⏳</span>
+                    Voting Closed
+                  </div>
                 ) : (
-                  '🔊 Human Killed It!'
+                  <div className="flex items-center justify-center">
+                    <span className="text-3xl mr-3">🔊</span>
+                    Vote for Human
+                  </div>
                 )}
               </button>
-              
+
               <button
                 onClick={() => submitVote('ai')}
-                disabled={voting}
+                disabled={!isVotingAllowed()}
                 className="w-full bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white py-6 px-6 rounded-2xl font-bold text-xl transition-all duration-200 disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg border-2 border-orange-500"
                 style={{ minHeight: '80px', touchAction: 'manipulation' }}
               >
@@ -265,21 +395,36 @@ export default function Vote() {
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
                     Submitting...
                   </div>
+                ) : !gameState?.isVotingOpen ? (
+                  <div className="flex items-center justify-center">
+                    <span className="mr-2">⏳</span>
+                    Voting Closed
+                  </div>
                 ) : (
-                  '🤖 AI Crushed It!'
-                )}
-              </button>
-
-              {/* Current vote count preview */}
-              <div className="text-center text-gray-400 text-sm mt-6">
-                Current votes: {gameState.votes.human + gameState.votes.ai}
-                {gameState.votes.human + gameState.votes.ai > 0 && (
-                  <div className="flex justify-center space-x-6 mt-2">
-                    <span className="text-blue-400">🔊 {gameState.votes.human}</span>
-                    <span className="text-orange-400">🤖 {gameState.votes.ai}</span>
+                  <div className="flex items-center justify-center">
+                    <span className="text-3xl mr-3">🤖</span>
+                    Vote for AI
                   </div>
                 )}
-              </div>
+              </button>
+              
+              {/* Guidance text */}
+              {!isVotingAllowed() && gameState && (
+                <div className="text-center mt-6 p-4 bg-yellow-600/20 border border-yellow-500 rounded-lg">
+                  <p className="text-yellow-300 font-medium">
+                    {!gameState.gameStarted ? '⏳ Game not started yet' :
+                     !gameState.topic ? '⏳ Waiting for topic' :
+                     !gameState.aiRoast ? '⏳ Waiting for AI roast' :
+                     !gameState.isVotingOpen ? '⏳ Waiting for host to open voting' :
+                     hasVoted ? '✅ Vote submitted' :
+                     voting ? '⏳ Submitting vote...' :
+                     '⏳ Waiting for host to open voting'}
+                  </p>
+                  <p className="text-yellow-200 text-sm mt-1">
+                    This page will update automatically
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
