@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useState, useRef } from 'react'
 import { useBattleStore } from '@/store/battleStore'
 import { useSettingsStore } from '@/store/settingsStore'
 import { useConnectionStore } from '@/store/connectionStore'
@@ -18,23 +18,108 @@ export function BattleController({ battleId, children }: BattleControllerProps) 
   const { topics, coinFlipResult, setCoinFlipResult, aiModel, voice } = useSettingsStore()
   const { setWSStatus } = useConnectionStore()
 
+  // Use ref to maintain stable callback reference
+  const handleRealtimeUpdateRef = useRef<(data: any) => void>()
+
+  // Real-time event handler
+  const handleRealtimeUpdate = useCallback((data: any) => {
+    console.log('[BattleController] Processing SSE message:', data.type, data)
+    switch (data.type) {
+      case 'initial':
+      case 'battle_updated':
+        console.log('[BattleController] Updating battle state:', data.battle)
+        setBattle(data.battle)
+        // Update vote tallies for all rounds
+        if (data.voteTallies) {
+          Object.entries(data.voteTallies).forEach(([round, tally]) => {
+            updateVoteTally(parseInt(round), tally as any)
+          })
+        }
+        if (data.audienceCount !== undefined) {
+          setAudienceCount(data.audienceCount)
+        }
+        break
+      case 'vote_update':
+        console.log('📈 Vote update received:', data)
+        // Update all round tallies from the received data
+        if (data.voteTallies) {
+          Object.entries(data.voteTallies).forEach(([round, tally]) => {
+            if (tally) { // Only update if tally exists
+              updateVoteTally(parseInt(round), tally as any)
+            }
+          })
+        }
+        setAudienceCount(data.audienceCount || 0)
+        break
+      case 'timer_update':
+        console.log('⏰ Timer update received:', data.timer)
+        updateTimer(data.timer)
+        break
+      case 'roast_ready':
+        addRoast(data.roast)
+        break
+      case 'heartbeat':
+        // Keep connection alive
+        break
+      case 'test':
+        console.log('🧪 Test message received:', data.message)
+        break
+      default:
+        console.warn('[BattleController] Unknown SSE message type:', data.type)
+    }
+  }, [updateVoteTally, setAudienceCount, addRoast, setBattle, updateTimer])
+
+  // Update ref when callback changes
+  useEffect(() => {
+    handleRealtimeUpdateRef.current = handleRealtimeUpdate
+  }, [handleRealtimeUpdate])
+
   // Initialize battle
-  const initializeBattle = useCallback(() => {
+  const initializeBattle = useCallback(async () => {
+    console.log('🟡 initializeBattle called:', { battleId, isInitialized, topics: topics.length })
     if (!battleId || isInitialized) return
 
-    const newBattle: Battle = {
-      id: battleId,
-      topics: topics,
-      currentRound: 1,
-      status: 'pending',
-      turn: coinFlipResult || 'human',
-      timer: 0,
-      coinFlipResult,
-      timestamp: Date.now(),
+    try {
+      // First try to fetch existing battle from server
+      console.log('🔍 Trying to fetch existing battle:', battleId)
+      const existingBattle = await apiService.getBattle(battleId)
+      console.log('✅ Found existing battle:', existingBattle)
+      setBattle(existingBattle)
+      setIsInitialized(true)
+      return
+    } catch (error) {
+      // Battle doesn't exist, create it
+      console.log('❌ Battle not found, creating new battle...', error)
     }
 
-    setBattle(newBattle)
-    setIsInitialized(true)
+    try {
+      // Use default topics if none selected
+      const battleTopics = topics.length === 3 ? topics : ['New York City', 'Gen Z', 'Social Media Influencers']
+      console.log('🔨 Creating battle with topics:', battleTopics)
+      
+      // Create battle on server with specific ID
+      const newBattle = await apiService.createBattle(battleTopics, coinFlipResult, battleId)
+      console.log('✅ Created battle:', newBattle)
+      setBattle(newBattle)
+      setIsInitialized(true)
+    } catch (error) {
+      console.error('💥 Failed to create battle:', error)
+      // Fallback to local state only
+      const battleTopics = topics.length === 3 ? topics : ['New York City', 'Gen Z', 'Social Media Influencers']
+      const newBattle: Battle = {
+        id: battleId,
+        topics: battleTopics,
+        currentRound: 1,
+        status: 'pending',
+        turn: coinFlipResult || 'human',
+        timer: 0,
+        coinFlipResult,
+        timestamp: Date.now(),
+      }
+      console.log('🚨 Using fallback battle:', newBattle)
+      setBattle(newBattle)
+      setIsInitialized(true)
+    }
   }, [battleId, topics, coinFlipResult, setBattle, isInitialized])
 
   // Coin flip logic
@@ -50,39 +135,34 @@ export function BattleController({ battleId, children }: BattleControllerProps) 
     }, 3000) // 3 second animation
   }, [setCoinFlipResult, setTurn, setLoading])
 
-  // Real-time event handler
-  const handleRealtimeUpdate = useCallback((data: any) => {
-    switch (data.type) {
-      case 'vote_update':
-        updateVoteTally(data.round, data.roundTally)
-        setAudienceCount(data.audienceCount)
-        break
-      case 'roast_ready':
-        addRoast(data.roast)
-        break
-      case 'battle_updated':
-        setBattle(data.battle)
-        break
-    }
-  }, [updateVoteTally, setAudienceCount, addRoast, setBattle])
-
   // Start battle
   const startBattle = useCallback(async () => {
-    if (!battle) return
+    console.log('🚀 startBattle called:', { battle: battle?.id, status: battle?.status })
+    if (!battle) {
+      console.log('❌ No battle to start!')
+      return
+    }
 
     try {
       setLoading(true)
+      console.log('⚡ Updating battle to live status:', battle.id)
       
-      // Create battle via API
-      const createdBattle = await apiService.createBattle(topics, coinFlipResult)
-      setBattle({
-        ...createdBattle,
+      // Update existing battle to live status
+      const updatedBattle = await apiService.updateBattle(battle.id, {
         status: 'live',
         timer: 60,
       })
+      console.log('✅ Battle updated:', updatedBattle)
+      setBattle(updatedBattle)
 
       // Start real-time events
-      const eventsource = apiService.connectToEvents(createdBattle.id, handleRealtimeUpdate)
+      console.log('🔌 Connecting to events:', battle.id)
+      const stableHandler = (data: any) => {
+        if (handleRealtimeUpdateRef.current) {
+          handleRealtimeUpdateRef.current(data)
+        }
+      }
+      const eventsource = apiService.connectToEvents(battle.id, stableHandler)
       setEventSource(eventsource)
       setWSStatus('connected')
       
@@ -110,56 +190,32 @@ export function BattleController({ battleId, children }: BattleControllerProps) 
       })
       
       addRoast(aiRoast)
-      setTurn('human') // Switch to human
-      updateTimer(60) // Reset timer
+      // Server handles timer and turn switching automatically
     } catch (error) {
       console.error('AI roast failed:', error)
-      // Switch turns anyway to keep game moving
-      setTurn('human')
-      updateTimer(60)
+      // Server will handle turn switching after timeout
     } finally {
       setLoading(false)
     }
-  }, [battle, aiModel.id, voice.id, setLoading, addRoast, setTurn, updateTimer])
+  }, [battle, aiModel.id, voice.id, setLoading, addRoast])
 
-  // Timer logic
+  // Server-side timer handles timing automatically
+  // AI turn trigger based on server state
   useEffect(() => {
-    if (!battle || battle.status !== 'live' || battle.timer <= 0) return
+    if (battle?.turn === 'ai' && battle?.timer === 60) {
+      // Server just switched to AI turn, trigger AI roast
+      handleAITurn()
+    }
+  }, [battle?.turn, battle?.timer, handleAITurn])
 
-    const interval = setInterval(() => {
-      updateTimer(battle.timer - 1)
-
-      if (battle.timer <= 1) {
-        // Auto-trigger AI turn when it's AI's turn and timer expires
-        if (battle.turn === 'ai') {
-          handleAITurn()
-        } else {
-          // Switch to AI turn
-          setTurn('ai')
-          updateTimer(60)
-        }
-      }
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [battle, updateTimer, setTurn, handleAITurn])
-
-  // Round progression logic
-  const advanceRound = useCallback(() => {
-    if (!battle || battle.currentRound >= 3) return
-
-    nextRound()
-    setTurn(coinFlipResult || 'human') // Reset to coin flip winner
-    updateTimer(60)
-  }, [battle, nextRound, setTurn, coinFlipResult, updateTimer])
-
+  // Server handles round progression automatically
   // End battle logic
   const endBattle = useCallback(() => {
     if (!battle) return
 
     setBattle({
       ...battle,
-      status: 'ended',
+      status: 'finished',
       timer: 0,
     })
   }, [battle, setBattle])
@@ -167,9 +223,31 @@ export function BattleController({ battleId, children }: BattleControllerProps) 
   // Auto-initialize on mount
   useEffect(() => {
     if (battleId && !isInitialized) {
-      initializeBattle()
+      initializeBattle().catch(console.error)
     }
   }, [battleId, initializeBattle, isInitialized])
+
+  // Ensure we stay subscribed to live battle updates (handles page refresh & dropped connections)
+  useEffect(() => {
+    if (battle && battle.status === 'live' && !eventSource) {
+      console.log('[BattleController] Establishing SSE connection for live battle:', battle.id)
+      try {
+        // Create wrapper function that uses the ref
+        const stableHandler = (data: any) => {
+          if (handleRealtimeUpdateRef.current) {
+            handleRealtimeUpdateRef.current(data)
+          }
+        }
+        
+        const es = apiService.connectToEvents(battle.id, stableHandler)
+        setEventSource(es)
+        setWSStatus('connected')
+      } catch (err) {
+        console.error('Failed to establish SSE connection:', err)
+        setWSStatus('error')
+      }
+    }
+  }, [battle?.id, battle?.status, eventSource, setWSStatus])
 
   // Cleanup EventSource on unmount
   useEffect(() => {
@@ -185,7 +263,6 @@ export function BattleController({ battleId, children }: BattleControllerProps) 
     initializeBattle,
     performCoinFlip,
     startBattle,
-    advanceRound,
     endBattle,
     isInitialized,
   }
@@ -218,18 +295,42 @@ export function useBattleController() {
 
   const handleRealtimeUpdate = useCallback((data: any) => {
     switch (data.type) {
+      case 'initial':
+      case 'battle_updated':
+        setBattle(data.battle)
+        // Update vote tallies for all rounds
+        if (data.voteTallies) {
+          Object.entries(data.voteTallies).forEach(([round, tally]) => {
+            updateVoteTally(parseInt(round), tally as any)
+          })
+        }
+        if (data.audienceCount !== undefined) {
+          setAudienceCount(data.audienceCount)
+        }
+        break
       case 'vote_update':
-        updateVoteTally(data.round, data.roundTally)
-        setAudienceCount(data.audienceCount)
+        console.log('📈 Vote update received:', data)
+        // Update all round tallies from the received data
+        if (data.voteTallies) {
+          Object.entries(data.voteTallies).forEach(([round, tally]) => {
+            if (tally) { // Only update if tally exists
+              updateVoteTally(parseInt(round), tally as any)
+            }
+          })
+        }
+        setAudienceCount(data.audienceCount || 0)
+        break
+      case 'timer_update':
+        updateTimer(data.timer)
         break
       case 'roast_ready':
         addRoast(data.roast)
         break
-      case 'battle_updated':
-        setBattle(data.battle)
+      case 'heartbeat':
+        // Keep connection alive
         break
     }
-  }, [updateVoteTally, setAudienceCount, addRoast, setBattle])
+  }, [updateVoteTally, setAudienceCount, addRoast, setBattle, updateTimer])
 
   const startBattle = useCallback(async () => {
     if (!battle) return
@@ -237,14 +338,14 @@ export function useBattleController() {
     try {
       setLoading(true)
       
-      const createdBattle = await apiService.createBattle(topics, coinFlipResult)
-      setBattle({
-        ...createdBattle,
+      // Update existing battle to live status
+      const updatedBattle = await apiService.updateBattle(battle.id, {
         status: 'live',
         timer: 60,
       })
+      setBattle(updatedBattle)
 
-      const eventSource = apiService.connectToEvents(createdBattle.id, handleRealtimeUpdate)
+      const eventSource = apiService.connectToEvents(battle.id, handleRealtimeUpdate)
       setWSStatus('connected')
       
     } catch (error) {
@@ -270,24 +371,16 @@ export function useBattleController() {
       })
       
       addRoast(aiRoast)
-      setTurn('human')
-      updateTimer(60)
+      // Server handles timer and turn switching automatically
     } catch (error) {
       console.error('AI roast failed:', error)
-      setTurn('human')
-      updateTimer(60)
+      // Server will handle turn switching after timeout
     } finally {
       setLoading(false)
     }
-  }, [battle, aiModel.id, voice.id, setLoading, addRoast, setTurn, updateTimer])
+  }, [battle, aiModel.id, voice.id, setLoading, addRoast])
 
-  const advanceRound = useCallback(() => {
-    if (!battle || battle.currentRound >= 3) return
-
-    nextRound()
-    setTurn(coinFlipResult || 'human')
-    updateTimer(60)
-  }, [battle, nextRound, setTurn, coinFlipResult, updateTimer])
+  // Server handles round progression automatically
 
   const endBattle = useCallback(() => {
     if (!battle) return
@@ -302,7 +395,6 @@ export function useBattleController() {
   return {
     performCoinFlip,
     startBattle,
-    advanceRound,
     endBattle,
     handleAITurn,
   }

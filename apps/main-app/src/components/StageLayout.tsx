@@ -5,6 +5,7 @@ import { TopicStepper } from './TopicStepper'
 import { VoteBar } from './VoteBar'
 import { RoastCard } from './RoastCard'
 import { QRDisplay } from './QRDisplay'
+import { useEffect } from 'react'
 
 interface StageLayoutProps {
   battleId: string
@@ -13,6 +14,18 @@ interface StageLayoutProps {
 export function StageLayout({ battleId }: StageLayoutProps) {
   const { battle, roasts, totalTally, audienceCount } = useBattleStore()
   const { wsStatus } = useConnectionStore()
+
+  // Debug logging to track state changes
+  useEffect(() => {
+    console.log('[StageLayout] Battle state changed:', {
+      timer: battle?.timer,
+      round: battle?.currentRound,
+      turn: battle?.turn,
+      status: battle?.status,
+      totalTally,
+      audienceCount
+    })
+  }, [battle?.timer, battle?.currentRound, battle?.turn, battle?.status, totalTally, audienceCount])
 
   if (!battle) {
     return (

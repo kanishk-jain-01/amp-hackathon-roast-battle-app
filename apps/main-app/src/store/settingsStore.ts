@@ -12,7 +12,7 @@ interface SettingsState {
 interface SettingsActions {
   setAIModel: (model: AIModel) => void
   setVoice: (voice: Voice) => void
-  setCoinFlipResult: (result: Speaker) => void
+  setCoinFlipResult: (result?: Speaker) => void
   setTopics: (topics: string[]) => void
 }
 
@@ -64,6 +64,22 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     {
       name: 'roast-battle-settings',
       storage: createJSONStorage(() => localStorage),
+      // Persist only the settings that should be remembered across sessions.
+      // Exclude transient values like `coinFlipResult` so a fresh battle starts with no coin flip.
+      partialize: state => ({
+        aiModel: state.aiModel,
+        voice: state.voice,
+        topics: state.topics,
+      }),
+      version: 2,
+      migrate: (persistedState, version) => {
+        if (version === 2 && persistedState) {
+          // Drop coinFlipResult if it existed in previous versions
+          const { coinFlipResult, ...rest } = persistedState as any
+          return rest
+        }
+        return persistedState as any
+      },
     }
   )
 )

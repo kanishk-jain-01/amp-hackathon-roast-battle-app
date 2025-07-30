@@ -51,12 +51,17 @@ export const useBattleStore = create<BattleState & BattleActions>()(
     updateVoteTally: (round, tally) =>
       set(state => {
         state.voteTallies[round] = tally
-        // Recalculate total
+        // Recalculate total with null checks
         state.totalTally = Object.values(state.voteTallies).reduce(
-          (total, roundTally) => ({
-            human: total.human + roundTally.human,
-            ai: total.ai + roundTally.ai,
-          }),
+          (total, roundTally) => {
+            // Handle undefined or null roundTally
+            if (!roundTally) return total
+            
+            return {
+              human: total.human + (roundTally.human || 0),
+              ai: total.ai + (roundTally.ai || 0),
+            }
+          },
           { human: 0, ai: 0 }
         )
       }),

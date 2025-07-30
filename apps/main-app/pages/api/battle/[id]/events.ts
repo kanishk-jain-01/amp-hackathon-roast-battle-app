@@ -1,8 +1,14 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { dataStore } from '@/lib/data-store'
+import { enableCors } from '@/lib/cors'
 
 // Simple Server-Sent Events implementation for real-time updates
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Enable CORS for cross-origin requests
+  if (enableCors(req, res)) {
+    return // Preflight request handled
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
@@ -26,14 +32,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Cache-Control',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET',
   })
 
   // Generate connection ID
   const connectionId = Math.random().toString(36).substring(2, 15)
   
+  console.log(`[SSE] New connection ${connectionId} for battle ${battleId}`)
+  
   // Add connection to store
-  dataStore.addConnection(connectionId, battleId)
+  dataStore.addConnection(connectionId, battleId, res)
 
   // Send initial data
   const initialData = {
@@ -49,58 +58,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     audienceCount: dataStore.getAudienceCount(battleId),
   }
 
+  console.log(`[SSE] Sending initial data to connection ${connectionId}:`, initialData.type)
   res.write(`data: ${JSON.stringify(initialData)}\n\n`)
+
+  // Send a test message to verify SSE is working
+  setTimeout(() => {
+    console.log(`[SSE] Sending test message to connection ${connectionId}`)
+    res.write(`data: ${JSON.stringify({ type: 'test', message: 'SSE connection working', timestamp: Date.now() })}\n\n`)
+  }, 1000)
 
   // Keep connection alive with heartbeat
   const heartbeat = setInterval(() => {
-    res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`)
+    if (!res.destroyed && res.writable) {
+      res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`)
+    } else {
+      clearInterval(heartbeat)
+      dataStore.removeConnection(connectionId)
+    }
   }, 30000) // 30 seconds
 
-  // Cleanup on client disconnect
-  req.on('close', () => {
+  // Cleanup function
+  const cleanup = () => {
+    console.log(`[SSE] Cleaning up connection ${connectionId} for battle ${battleId}`)
     clearInterval(heartbeat)
     dataStore.removeConnection(connectionId)
-    res.end()
-  })
-
-  req.on('error', () => {
-    clearInterval(heartbeat)
-    dataStore.removeConnection(connectionId)
-    res.end()
-  })
-
-  // Send periodic updates (simplified - in production you'd use proper pub/sub)
-  const updateInterval = setInterval(() => {
-    try {
-      const currentBattle = dataStore.getBattle(battleId)
-      if (!currentBattle) {
-        clearInterval(updateInterval)
-        res.end()
-        return
-      }
-
-      const updateData = {
-        type: 'update',
-        battle: currentBattle,
-        voteTallies: {
-          1: dataStore.getVoteTally(battleId, 1),
-          2: dataStore.getVoteTally(battleId, 2),
-          3: dataStore.getVoteTally(battleId, 3),
-        },
-        totalTally: dataStore.getVoteTally(battleId),
-        audienceCount: dataStore.getAudienceCount(battleId),
-      }
-
-      res.write(`data: ${JSON.stringify(updateData)}\n\n`)
-    } catch (error) {
-      console.error('Error sending update:', error)
-      clearInterval(updateInterval)
+    if (!res.destroyed) {
       res.end()
     }
-  }, 2000) // Update every 2 seconds
+  }
 
-  // Cleanup interval on disconnect
-  req.on('close', () => {
-    clearInterval(updateInterval)
-  })
+  // Cleanup on client disconnect
+  req.on('close', cleanup)
+  req.on('error', cleanup)
+
+  // Remove the conflicting periodic update interval that interferes with real-time broadcasts
+  // The broadcastToBattle calls from vote.ts and other endpoints handle real-time updates
 }

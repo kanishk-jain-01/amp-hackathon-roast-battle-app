@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { dataStore } from '@/lib/data-store'
 import { Battle, BattleStatus } from '@roast-battle/ui'
+import { enableCors } from '@/lib/cors'
 
 interface UpdateBattleRequest {
   status?: BattleStatus
@@ -10,6 +11,11 @@ interface UpdateBattleRequest {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Enable CORS for cross-origin requests
+  if (enableCors(req, res)) {
+    return // Preflight request handled
+  }
+
   const { id } = req.query
   const battleId = id as string
 
@@ -33,7 +39,13 @@ async function getBattle(battleId: string, res: NextApiResponse) {
     const battle = dataStore.getBattle(battleId)
     
     if (!battle) {
-      return res.status(404).json({ error: 'Battle not found' })
+      // Debug: Log available battles
+      const allBattles = dataStore.getAllBattles()
+      console.log(`Battle ${battleId} not found. Available battles:`, allBattles.map(b => ({ id: b.id, status: b.status })))
+      return res.status(404).json({ 
+        error: 'Battle not found',
+        availableBattles: allBattles.map(b => b.id)
+      })
     }
 
     const roasts = dataStore.getRoasts(battleId)

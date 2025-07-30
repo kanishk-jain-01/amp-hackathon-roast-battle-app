@@ -1,13 +1,20 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { dataStore } from '@/lib/data-store'
 import { Battle } from '@roast-battle/ui'
+import { enableCors } from '@/lib/cors'
 
 interface CreateBattleRequest {
+  id?: string
   topics: string[]
   coinFlipResult?: 'human' | 'ai'
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Enable CORS for cross-origin requests
+  if (enableCors(req, res)) {
+    return // Preflight request handled
+  }
+
   if (req.method === 'POST') {
     return createBattle(req, res)
   } else if (req.method === 'GET') {
@@ -19,14 +26,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 async function createBattle(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { topics, coinFlipResult }: CreateBattleRequest = req.body
+    const { id, topics, coinFlipResult }: CreateBattleRequest = req.body
 
     if (!topics || !Array.isArray(topics) || topics.length !== 3) {
       return res.status(400).json({ error: 'Exactly 3 topics are required' })
     }
 
-    // Generate battle ID
-    const battleId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+    // Use provided ID or generate a new one
+    const battleId = id || Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
 
     const battle: Battle = {
       id: battleId,

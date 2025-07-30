@@ -55,6 +55,12 @@ async function createRoast(battleId: string, req: NextApiRequest, res: NextApiRe
 
     const createdRoast = dataStore.addRoast(roast)
 
+    // Broadcast roast to all connected clients
+    dataStore.broadcastToBattle(battleId, {
+      type: 'roast_ready',
+      roast: createdRoast,
+    })
+
     return res.status(201).json({
       success: true,
       roast: createdRoast,

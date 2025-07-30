@@ -1,6 +1,6 @@
 export type Speaker = 'human' | 'ai'
 
-export type BattleStatus = 'pending' | 'live' | 'ended'
+export type BattleStatus = 'pending' | 'live' | 'ended' | 'finished'
 
 export interface Battle {
   id: string

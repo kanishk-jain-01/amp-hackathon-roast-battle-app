@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { dataStore } from '@/lib/data-store'
 import { Vote } from '@roast-battle/ui'
+import { enableCors } from '@/lib/cors'
 
 interface VoteRequest {
   voterHash: string
@@ -9,6 +10,11 @@ interface VoteRequest {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Enable CORS for cross-origin requests
+  if (enableCors(req, res)) {
+    return // Preflight request handled
+  }
+
   const { id } = req.query
   const battleId = id as string
 
@@ -61,16 +67,31 @@ async function castVote(battleId: string, req: NextApiRequest, res: NextApiRespo
       timestamp: Date.now(),
     }
 
+    // Add vote to in-memory store
     const voteAdded = dataStore.addVote(vote)
+    console.log(`[VOTE] Battle ${battleId} | Round ${round} | ${voteFor} | voterHash=${voterHash} | accepted=${voteAdded}`)
 
     if (!voteAdded) {
       return res.status(409).json({ error: 'You have already voted in this round' })
     }
 
+    // Update battle timestamp to trigger polling detection
+    dataStore.updateBattleQuiet(battleId, { timestamp: Date.now() })
+
     // Get updated vote tallies
     const roundTally = dataStore.getVoteTally(battleId, round)
     const totalTally = dataStore.getVoteTally(battleId)
     const audienceCount = dataStore.getAudienceCount(battleId)
+
+    // Broadcast vote update to all connected clients (SSE)
+    console.log(`[VOTE] Broadcasting update to battle ${battleId} — Human: ${roundTally.human}, AI: ${roundTally.ai}, Audience: ${audienceCount}`)
+    dataStore.broadcastToBattle(battleId, {
+      type: 'vote_update',
+      round,
+      roundTally,
+      totalTally,
+      audienceCount,
+    })
 
     return res.status(201).json({
       success: true,

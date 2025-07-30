@@ -48,6 +48,8 @@ export default function BattlePage() {
   // Handle new battle
   const handleNewBattle = () => {
     const newBattleId = generateBattleId()
+    // Clear previous coin flip so the new battle starts fresh
+    setCoinFlipResult(undefined)
     router.push(`/battle/${newBattleId}`)
     setShowWinner(false)
   }

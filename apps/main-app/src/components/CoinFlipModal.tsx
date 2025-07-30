@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Dialog, DialogContent } from '@radix-ui/react-dialog'
 import { Speaker } from '@roast-battle/ui'
 
@@ -13,7 +13,7 @@ export function CoinFlipModal({ isOpen, onResult, onClose }: CoinFlipModalProps)
   const [result, setResult] = useState<Speaker | null>(null)
   const [showResult, setShowResult] = useState(false)
 
-  const startCoinFlip = () => {
+  const startCoinFlip = useCallback(() => {
     setIsFlipping(true)
     setResult(null)
     setShowResult(false)
@@ -31,13 +31,13 @@ export function CoinFlipModal({ isOpen, onResult, onClose }: CoinFlipModalProps)
         onClose()
       }, 2000)
     }, 3000)
-  }
+  }, [onResult, onClose])
 
   useEffect(() => {
     if (isOpen && !isFlipping) {
       startCoinFlip()
     }
-  }, [isOpen, isFlipping])
+  }, [isOpen, isFlipping, startCoinFlip])
 
   if (!isOpen) return null
 

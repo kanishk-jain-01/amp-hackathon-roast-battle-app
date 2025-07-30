@@ -96,6 +96,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const savedRoast = dataStore.addRoast(roast)
 
+    // Broadcast roast to all connected clients
+    dataStore.broadcastToBattle(battleId, {
+      type: 'roast_ready',
+      roast: savedRoast,
+    })
+
     return res.status(201).json({
       success: true,
       roast: savedRoast,
